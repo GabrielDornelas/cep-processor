@@ -10,6 +10,7 @@ import requests
 
 from src.utils.logger import setup_logger
 from src.utils.error_handler import ErrorHandler
+from src.utils.config_helper import get_config
 
 
 class ViaCEPClient:
@@ -20,9 +21,9 @@ class ViaCEPClient:
 
     def __init__(
         self,
-        base_url: str = "https://viacep.com.br/ws",
-        timeout: int = 30,
-        retry_attempts: int = 3,
+        base_url: Optional[str] = None,
+        timeout: Optional[int] = None,
+        retry_attempts: Optional[int] = None,
         retry_delay: float = 1.0,
         errors_csv_path: Optional[Path] = None
     ):
@@ -30,16 +31,17 @@ class ViaCEPClient:
         Initialize the ViaCEP client.
 
         Args:
-            base_url: Base URL for ViaCEP API
-            timeout: Request timeout in seconds
-            retry_attempts: Number of retry attempts for failed requests
+            base_url: Base URL for ViaCEP API (optional, will use ConfigHelper if not provided)
+            timeout: Request timeout in seconds (optional, will use ConfigHelper if not provided)
+            retry_attempts: Number of retry attempts for failed requests (optional, will use ConfigHelper if not provided)
             retry_delay: Delay between retries in seconds
-            errors_csv_path: Path to CSV file for storing errors. If None, errors won't be saved to CSV.
+            errors_csv_path: Path to CSV file for storing errors. If None, will use ConfigHelper.
                             Default: data/viacep_errors.csv
         """
-        self.base_url = base_url.rstrip('/')
-        self.timeout = timeout
-        self.retry_attempts = retry_attempts
+        config = get_config()
+        self.base_url = (base_url or config.get_viacep_base_url()).rstrip('/')
+        self.timeout = timeout or config.get_request_timeout()
+        self.retry_attempts = retry_attempts or config.get_retry_attempts()
         self.retry_delay = retry_delay
         self.logger = setup_logger(name="viacep_client")
         self.session = requests.Session()
@@ -48,9 +50,9 @@ class ViaCEPClient:
             'Accept': 'application/json'
         })
         
-        # Initialize error handler if CSV path is provided
+        # Initialize error handler
         if errors_csv_path is None:
-            errors_csv_path = Path("data/viacep_errors.csv")
+            errors_csv_path = config.get_errors_csv_path()
         self.error_handler = ErrorHandler(errors_csv_path=errors_csv_path)
 
     def query_cep(self, cep: str) -> Optional[Dict[str, Any]]:

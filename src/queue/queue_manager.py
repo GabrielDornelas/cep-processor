@@ -12,6 +12,7 @@ import pika
 from pika.exceptions import AMQPConnectionError, AMQPChannelError
 
 from src.utils.logger import setup_logger
+from src.utils.config_helper import get_config
 
 
 class QueueManager:
@@ -22,28 +23,29 @@ class QueueManager:
 
     def __init__(
         self,
-        rabbitmq_url: str = "amqp://guest:guest@localhost:5672/",
+        rabbitmq_url: Optional[str] = None,
         queue_name: str = "cep_processing",
-        rate_limit_per_second: float = 5.0,
+        rate_limit_per_second: Optional[float] = None,
         prefetch_count: int = 1
     ):
         """
         Initialize the queue manager.
 
         Args:
-            rabbitmq_url: RabbitMQ connection URL
+            rabbitmq_url: RabbitMQ connection URL (optional, will use ConfigHelper if not provided)
             queue_name: Name of the queue for CEP processing
-            rate_limit_per_second: Maximum requests per second
+            rate_limit_per_second: Maximum requests per second (optional, will use ConfigHelper if not provided)
             prefetch_count: Number of unacknowledged messages per consumer
         """
-        self.rabbitmq_url = rabbitmq_url
+        config = get_config()
+        self.rabbitmq_url = rabbitmq_url or config.get_rabbitmq_url()
         self.queue_name = queue_name
-        self.rate_limit_per_second = rate_limit_per_second
+        self.rate_limit_per_second = rate_limit_per_second or config.get_rate_limit_per_second()
         self.prefetch_count = prefetch_count
         self.logger = setup_logger(name="queue_manager")
         
         # Calculate delay between requests
-        self.delay_between_requests = 1.0 / rate_limit_per_second if rate_limit_per_second > 0 else 0
+        self.delay_between_requests = 1.0 / self.rate_limit_per_second if self.rate_limit_per_second > 0 else 0
         
         # Connection and channel
         self.connection: Optional[pika.BlockingConnection] = None

@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from src.storage.models import Base, CEP
 from src.utils.logger import setup_logger
+from src.utils.config_helper import get_config
 
 
 class DatabaseManager:
@@ -20,15 +21,16 @@ class DatabaseManager:
     Handles connections, sessions, and CEP data operations.
     """
 
-    def __init__(self, database_url: str):
+    def __init__(self, database_url: Optional[str] = None):
         """
         Initialize database manager.
 
         Args:
-            database_url: PostgreSQL connection URL
+            database_url: PostgreSQL connection URL (optional, will use ConfigHelper if not provided)
                 Format: postgresql://user:password@host:port/database
         """
-        self.database_url = database_url
+        config = get_config()
+        self.database_url = database_url or config.get_database_url()
         self.logger = setup_logger(name="database_manager")
         self.engine: Optional[Engine] = None
         self.SessionLocal: Optional[sessionmaker] = None
@@ -63,7 +65,8 @@ class DatabaseManager:
 
             # Test connection
             with self.engine.connect() as conn:
-                conn.execute("SELECT 1")
+                from sqlalchemy import text
+                conn.execute(text("SELECT 1"))
 
             self.logger.info("Successfully connected to database")
             return True

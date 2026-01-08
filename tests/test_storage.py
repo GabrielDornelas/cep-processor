@@ -2,10 +2,26 @@
 Unit tests for storage module
 """
 
+import pytest
 from unittest.mock import Mock, patch
 
 from src.storage.models import CEP
 from src.storage.database import DatabaseManager
+
+
+@pytest.fixture
+def mock_config():
+    """Fixture to provide a mock config for all tests"""
+    mock = Mock()
+    mock.get_database_url.return_value = "postgresql://user:pass@localhost:5432/testdb"
+    return mock
+
+
+@pytest.fixture
+def mock_get_config(mock_config):
+    """Fixture to patch get_config and return mock_config"""
+    with patch('src.storage.database.get_config', return_value=mock_config) as mock:
+        yield mock
 
 
 class TestCEPModel:
@@ -105,7 +121,7 @@ class TestDatabaseManager:
         assert manager.SessionLocal is None
 
     @patch('src.storage.database.create_engine')
-    def test_connect_success(self, mock_create_engine):
+    def test_connect_success(self, mock_create_engine, mock_get_config):
         """Test successful database connection"""
         mock_engine = Mock()
         mock_conn = Mock()
@@ -122,7 +138,7 @@ class TestDatabaseManager:
         mock_create_engine.assert_called_once()
 
     @patch('src.storage.database.create_engine')
-    def test_connect_failure(self, mock_create_engine):
+    def test_connect_failure(self, mock_create_engine, mock_get_config):
         """Test failed database connection"""
         from sqlalchemy.exc import SQLAlchemyError
         mock_create_engine.side_effect = SQLAlchemyError("Connection failed")
@@ -143,7 +159,7 @@ class TestDatabaseManager:
 
     @patch('src.storage.database.create_engine')
     @patch('src.storage.database.Base.metadata.create_all')
-    def test_create_tables(self, mock_create_all, mock_create_engine):
+    def test_create_tables(self, mock_create_all, mock_create_engine, mock_get_config):
         """Test creating database tables"""
         mock_engine = Mock()
         mock_conn = Mock()
@@ -160,7 +176,7 @@ class TestDatabaseManager:
         mock_create_all.assert_called_once_with(bind=mock_engine)
 
     @patch('src.storage.database.create_engine')
-    def test_save_cep_new(self, mock_create_engine):
+    def test_save_cep_new(self, mock_create_engine, mock_get_config):
         """Test saving new CEP"""
         mock_engine = Mock()
         mock_conn = Mock()
@@ -193,7 +209,7 @@ class TestDatabaseManager:
             mock_session.add.assert_called_once()
 
     @patch('src.storage.database.create_engine')
-    def test_save_cep_existing(self, mock_create_engine):
+    def test_save_cep_existing(self, mock_create_engine, mock_get_config):
         """Test updating existing CEP"""
         mock_engine = Mock()
         mock_conn = Mock()
@@ -228,7 +244,7 @@ class TestDatabaseManager:
             assert existing_cep.logradouro == 'Avenida Paulista Updated'
 
     @patch('src.storage.database.create_engine')
-    def test_get_cep(self, mock_create_engine):
+    def test_get_cep(self, mock_create_engine, mock_get_config):
         """Test retrieving CEP from database"""
         mock_engine = Mock()
         mock_conn = Mock()
@@ -256,7 +272,7 @@ class TestDatabaseManager:
             assert result.cep == '01310100'
 
     @patch('src.storage.database.create_engine')
-    def test_count_ceps(self, mock_create_engine):
+    def test_count_ceps(self, mock_create_engine, mock_get_config):
         """Test counting CEPs in database"""
         mock_engine = Mock()
         mock_conn = Mock()
