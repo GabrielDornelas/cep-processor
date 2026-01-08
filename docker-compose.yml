@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: cep-processor-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cep_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cep_password}
+      POSTGRES_DB: ${POSTGRES_DB:-cep_processor}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cep_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cep-processor-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: cep-processor-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672" # AMQP port
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cep-processor-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cep-processor-app
+    environment:
+      ENV: ${ENV:-local}
+      DOCKER_CONTAINER: "true"
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cep_user}:${POSTGRES_PASSWORD:-cep_password}@postgres:5432/${POSTGRES_DB:-cep_processor}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-cep_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cep_password}
+      POSTGRES_DB: ${POSTGRES_DB:-cep_processor}
+      # RabbitMQ
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      # ViaCEP
+      VIACEP_BASE_URL: ${VIACEP_BASE_URL:-https://viacep.com.br/ws}
+      RATE_LIMIT_PER_SECOND: ${RATE_LIMIT_PER_SECOND:-5}
+      # Processing
+      MAX_CEPS: ${MAX_CEPS:-10000}
+      REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-30}
+      RETRY_ATTEMPTS: ${RETRY_ATTEMPTS:-3}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # File Paths
+      CEPS_CSV_PATH: ${CEPS_CSV_PATH:-/app/data/ceps_collected.csv}
+      ERRORS_CSV_PATH: ${ERRORS_CSV_PATH:-/app/data/viacep_errors.csv}
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+      - ./tests:/app/tests
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - cep-processor-network
+    command: tail -f /dev/null # Keep container running (can be overridden)
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
+networks:
+  cep-processor-network:
+    driver: bridge
