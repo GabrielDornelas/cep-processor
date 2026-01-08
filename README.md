@@ -39,10 +39,11 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 1. Install dependencies:
-
 ```bash
 pip install -r requirements.txt
 ```
+
+**Note**: `lxml` is optional. If not installed, the code will use Python's built-in `html.parser`. For better performance, install `lxml` (see `INSTALL_WSL.md` for WSL instructions).
 
 1. Configure environment variables:
 
