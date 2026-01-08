@@ -6,7 +6,6 @@ import json
 import time
 import threading
 from typing import Optional, Callable, Dict, Any
-import queue as stdlib_queue
 
 import pika
 from pika.exceptions import AMQPConnectionError, AMQPChannelError

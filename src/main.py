@@ -10,6 +10,7 @@ Orchestrates the complete workflow:
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -21,7 +22,6 @@ from src.queue.queue_manager import QueueManager
 from src.storage.database import DatabaseManager
 from src.exporters.json_exporter import JSONExporter
 from src.exporters.xml_exporter import XMLExporter
-import os
 from src.utils.logger import setup_logger
 
 
@@ -79,8 +79,8 @@ class CEPProcessor:
         Collect CEPs via web scraping.
 
         Args:
-            max_ceps: Maximum number of CEPs to collect (uses config if None)
-            output_path: Path to save CSV file (uses config if None)
+            max_ceps: Maximum number of CEPs to collect (uses MAX_CEPS env var or 10000 if None)
+            output_path: Path to save CSV file (uses CEPS_CSV_PATH env var or default if None)
 
         Returns:
             Path to CSV file or None if failed
@@ -253,17 +253,19 @@ class CEPProcessor:
         max_ceps: Optional[int] = None,
         process_limit: Optional[int] = None,
         export_json: bool = True,
-        export_xml: bool = True
+        export_xml: bool = True,
+        csv_path: Optional[Path] = None
     ) -> bool:
         """
         Run the complete workflow.
 
         Args:
             collect: Whether to collect CEPs via web scraping
-            max_ceps: Maximum CEPs to collect (uses config if None)
+            max_ceps: Maximum CEPs to collect (uses MAX_CEPS env var or 10000 if None)
             process_limit: Maximum CEPs to process from queue (None = all)
             export_json: Whether to export JSON
             export_xml: Whether to export XML
+            csv_path: Path to CSV file (if None, uses environment variable or default)
 
         Returns:
             True if workflow completed successfully, False otherwise
@@ -276,12 +278,13 @@ class CEPProcessor:
         if not self.setup_connections():
             return False
         
-        # Get CSV path from environment or use default
-        csv_path_str = os.getenv('CEPS_CSV_PATH', 'data/ceps_collected.csv')
-        csv_path = Path(csv_path_str)
-        if not csv_path.is_absolute():
-            project_root = Path(__file__).parent.parent
-            csv_path = project_root / csv_path_str
+        # Get CSV path from argument, environment, or use default
+        if csv_path is None:
+            csv_path_str = os.getenv('CEPS_CSV_PATH', 'data/ceps_collected.csv')
+            csv_path = Path(csv_path_str)
+            if not csv_path.is_absolute():
+                project_root = Path(__file__).parent.parent
+                csv_path = project_root / csv_path_str
         
         # Step 1: Collect CEPs (if requested)
         if collect:
@@ -344,7 +347,7 @@ def main():
     parser.add_argument(
         '--max-ceps',
         type=int,
-        help='Maximum number of CEPs to collect (default: from config)'
+        help='Maximum number of CEPs to collect (default: from MAX_CEPS env var or 10000)'
     )
     
     parser.add_argument(
@@ -382,7 +385,8 @@ def main():
             max_ceps=args.max_ceps,
             process_limit=args.process_limit,
             export_json=args.export_format in ['json', 'both'] and not args.no_export,
-            export_xml=args.export_format in ['xml', 'both'] and not args.no_export
+            export_xml=args.export_format in ['xml', 'both'] and not args.no_export,
+            csv_path=args.csv_path
         )
         
         sys.exit(0 if success else 1)

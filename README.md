@@ -76,22 +76,20 @@ pip install -r requirements.txt
 
 4. Configure environment variables:
 
+You can set environment variables directly or use the `env.local.template` as a reference:
+
 ```bash
-cp env.local.template .env.local
-# Edit .env.local with your configuration
+# Option 1: Set environment variables directly
+export DATABASE_URL=postgresql://user:password@localhost:5432/cep_processor
+export RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+
+# Option 2: Create a .env file and load it manually (if using a tool like direnv)
+# See env.local.template for all available variables
 ```
 
 ## Configuration
 
-Copy env.local.template as listed below and edit as desired
-
-### Environment File Precedence
-
-The system loads environment files in the following order (later files override earlier ones):
-
-1. `.env` - Default values
-2. `.env.local` - Local overrides
-3. `.env.{ENV}` - Environment-specific overrides (e.g., `.env.staging`)
+The system uses environment variables directly. All configuration is done through environment variables with sensible defaults.
 
 ## Usage
 
@@ -232,9 +230,6 @@ docker-compose exec app python src/main.py --max-ceps 100 --export-format json
 
 #### 6. Utils (`src/utils/`)
 
-- **ConfigHelper**: Environment configuration
-  - Multi-environment support
-  - .env file loading
 - **Logger**: Structured logging
 - **ErrorHandler**: Error tracking to CSV
 
@@ -408,7 +403,6 @@ cep-processor/
 │   │   ├── json_exporter.py
 │   │   └── xml_exporter.py
 │   ├── utils/           # Utilities
-│   │   ├── config_helper.py
 │   │   ├── error_handler.py
 │   │   └── logger.py
 │   └── main.py          # Main orchestrator
