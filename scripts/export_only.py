@@ -19,15 +19,20 @@ def main():
     
     print("✓ Connected to database")
     
+    data_dir = Path('data')
+    if not data_dir.is_absolute():
+        project_root = Path(__file__).parent.parent
+        data_dir = project_root / 'data'
+    
     # Export to JSON
-    json_path = Path('data/ceps_export.json')
+    json_path = data_dir / 'ceps_export.json'
     if JSONExporter(db).export_to_file(json_path):
         print(f"✓ JSON exported to: {json_path}")
     else:
         print(f"❌ Failed to export JSON")
     
     # Export to XML
-    xml_path = Path('data/ceps_export.xml')
+    xml_path = data_dir / 'ceps_export.xml'
     if XMLExporter(db).export_to_file(xml_path):
         print(f"✓ XML exported to: {xml_path}")
     else:
