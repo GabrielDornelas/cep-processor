@@ -43,7 +43,8 @@ ENV/
 *.csv
 *.json
 *.xml
-data/
+data/*
+!data/.gitkeep
 output/
 
 # Logs
@@ -54,9 +55,6 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
-
-# Docker
-.dockerignore
 
 # Testing
 .pytest_cache/
