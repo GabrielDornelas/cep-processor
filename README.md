@@ -13,6 +13,7 @@ This system collects CEPs from codigo-postal.org (São Paulo/SP), queries detail
 - **Database Storage**: PostgreSQL with SQLAlchemy ORM
 - **Data Export**: JSON and XML export formats
 - **Docker Support**: Full containerization with Docker Compose
+- **AWS Integration**: AWS Glue and Lambda support for cloud deployment
 - **Error Handling**: Comprehensive error tracking and logging
 - **Rate Limiting**: Configurable rate limits to respect API constraints
 
@@ -510,6 +511,34 @@ qm.purge_queue()
 qm.disconnect()
 "
 ```
+
+## AWS Deployment
+
+This project includes AWS integration for cloud deployment:
+
+- **AWS Glue Job** (`aws/glue_job.py`): Process CEPs in batch using AWS Glue
+- **AWS Lambda Function** (`aws/lambda_function.py`): Process CEPs on-demand or via triggers (S3, API Gateway, SQS, EventBridge)
+
+### Quick Start
+
+1. **Batch Processing (Glue)**:
+
+   ```bash
+   aws s3 cp data/ceps_collected.csv s3://your-bucket/input/
+   aws glue start-job-run --job-name cep-processor-job
+   ```
+
+2. **On-Demand Processing (Lambda)**:
+   ```bash
+   aws lambda invoke \
+     --function-name cep-processor-lambda \
+     --payload '{"body": "{\"cep\": \"01310100\"}"}' \
+     response.json
+   ```
+
+For complete deployment instructions, infrastructure setup, configuration, and troubleshooting, see [aws/DEPLOY.md](aws/DEPLOY.md).
+
+---
 
 ## License
 
