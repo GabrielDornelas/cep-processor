@@ -3,12 +3,13 @@ ViaCEP API client module for querying CEP details
 """
 
 import time
+from pathlib import Path
 from typing import Optional, Dict, Any
-from urllib.parse import urljoin
 
 import requests
 
 from src.utils.logger import setup_logger
+from src.utils.error_handler import ErrorHandler
 
 
 class ViaCEPClient:
@@ -22,7 +23,8 @@ class ViaCEPClient:
         base_url: str = "https://viacep.com.br/ws",
         timeout: int = 30,
         retry_attempts: int = 3,
-        retry_delay: float = 1.0
+        retry_delay: float = 1.0,
+        errors_csv_path: Optional[Path] = None
     ):
         """
         Initialize the ViaCEP client.
@@ -32,6 +34,8 @@ class ViaCEPClient:
             timeout: Request timeout in seconds
             retry_attempts: Number of retry attempts for failed requests
             retry_delay: Delay between retries in seconds
+            errors_csv_path: Path to CSV file for storing errors. If None, errors won't be saved to CSV.
+                            Default: data/viacep_errors.csv
         """
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
@@ -43,6 +47,11 @@ class ViaCEPClient:
             'User-Agent': 'CEP-Processor/1.0',
             'Accept': 'application/json'
         })
+        
+        # Initialize error handler if CSV path is provided
+        if errors_csv_path is None:
+            errors_csv_path = Path("data/viacep_errors.csv")
+        self.error_handler = ErrorHandler(errors_csv_path=errors_csv_path)
 
     def query_cep(self, cep: str) -> Optional[Dict[str, Any]]:
         """
@@ -81,35 +90,72 @@ class ViaCEPClient:
 
                 # Check if CEP was found
                 if isinstance(data, dict) and data.get('erro'):
-                    self.logger.warning(f"CEP {cep} not found in ViaCEP")
+                    error_msg = f"CEP {cep} not found in ViaCEP"
+                    self.logger.warning(error_msg)
+                    # Record error to CSV (CEP not found is a valid error to record)
+                    self.error_handler.record_api_error(
+                        cep=cep,
+                        error_message=error_msg,
+                        status_code=200  # API returns 200 but with erro: true
+                    )
                     return None
 
                 # Validate response structure
                 if not isinstance(data, dict):
-                    self.logger.error(f"Invalid response format for CEP {cep}")
+                    error_msg = f"Invalid response format for CEP {cep}"
+                    self.logger.error(error_msg)
+                    # Record error to CSV (only on last attempt)
+                    if attempt == self.retry_attempts:
+                        self.error_handler.record_api_error(
+                            cep=cep,
+                            error_message=error_msg
+                        )
                     return None
 
                 self.logger.debug(f"Successfully queried CEP {cep}")
                 return data
 
             except requests.Timeout:
-                self.logger.warning(f"Timeout querying CEP {cep} (attempt {attempt}/{self.retry_attempts})")
+                error_msg = f"Timeout querying CEP {cep} (attempt {attempt}/{self.retry_attempts})"
+                self.logger.warning(error_msg)
                 if attempt < self.retry_attempts:
                     time.sleep(self.retry_delay * attempt)  # Exponential backoff
                 else:
                     self.logger.error(f"Max retries reached for CEP {cep}")
+                    # Record error to CSV on final failure
+                    self.error_handler.record_api_error(
+                        cep=cep,
+                        error_message=f"Timeout after {self.retry_attempts} attempts",
+                        retry_attempt=attempt
+                    )
                     return None
 
             except requests.RequestException as e:
-                self.logger.error(f"Error querying CEP {cep}: {e} (attempt {attempt}/{self.retry_attempts})")
+                error_msg = f"Error querying CEP {cep}: {e} (attempt {attempt}/{self.retry_attempts})"
+                self.logger.error(error_msg)
                 if attempt < self.retry_attempts:
                     time.sleep(self.retry_delay * attempt)  # Exponential backoff
                 else:
                     self.logger.error(f"Max retries reached for CEP {cep}")
+                    # Record error to CSV on final failure
+                    status_code = getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None
+                    self.error_handler.record_api_error(
+                        cep=cep,
+                        error_message=str(e),
+                        status_code=status_code,
+                        retry_attempt=attempt
+                    )
                     return None
 
             except ValueError as e:
-                self.logger.error(f"Error parsing JSON response for CEP {cep}: {e}")
+                error_msg = f"Error parsing JSON response for CEP {cep}: {e}"
+                self.logger.error(error_msg)
+                # Record error to CSV (only on last attempt)
+                if attempt == self.retry_attempts:
+                    self.error_handler.record_api_error(
+                        cep=cep,
+                        error_message=error_msg
+                    )
                 return None
 
         return None
