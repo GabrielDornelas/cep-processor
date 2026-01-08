@@ -307,6 +307,32 @@ class DatabaseManager:
             self.logger.error(f"Error retrieving CEPs by localidade from database: {e}")
             return []
 
+    def get_all_ceps(self, limit: Optional[int] = None, offset: int = 0) -> List[CEP]:
+        """
+        Get all CEPs from database.
+
+        Args:
+            limit: Maximum number of results (None = no limit)
+            offset: Number of results to skip
+
+        Returns:
+            List of CEP models (detached from session)
+        """
+        try:
+            with self.get_session() as session:
+                query = session.query(CEP).offset(offset)
+                if limit:
+                    query = query.limit(limit)
+                ceps = query.all()
+                # Expunge all objects from session so they can be used after session closes
+                for cep in ceps:
+                    session.expunge(cep)
+                return ceps
+
+        except SQLAlchemyError as e:
+            self.logger.error(f"Error retrieving all CEPs from database: {e}")
+            return []
+
     def count_ceps(self) -> int:
         """
         Get total number of CEPs in database.
