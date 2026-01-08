@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY src/ /app/src/
 COPY tests/ /app/tests/
+COPY scripts/ /app/scripts/
 
 # Create data directory
 RUN mkdir -p /app/data

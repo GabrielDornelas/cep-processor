@@ -41,6 +41,7 @@ docker-compose up -d
 ```
 
 This will start:
+
 - PostgreSQL database
 - RabbitMQ message broker
 - Application container
@@ -73,8 +74,6 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-**Note**: `lxml` is optional. If not installed, the code will use Python's built-in `html.parser`. For better performance, install `lxml`.
-
 4. Configure environment variables:
 
 ```bash
@@ -84,51 +83,12 @@ cp env.local.template .env.local
 
 ## Configuration
 
-Create a `.env.local` file (or use environment variables) with the following:
-
-```env
-# Environment
-ENV=local
-
-# Database Configuration
-POSTGRES_USER=cep_user
-POSTGRES_PASSWORD=cep_password
-POSTGRES_DB=cep_processor
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-# Or use full connection string:
-# DATABASE_URL=postgresql://cep_user:cep_password@localhost:5432/cep_processor
-
-# RabbitMQ Configuration
-RABBITMQ_USER=guest
-RABBITMQ_PASSWORD=guest
-RABBITMQ_HOST=localhost
-RABBITMQ_PORT=5672
-# Or use full connection string:
-# RABBITMQ_URL=amqp://guest:guest@localhost:5672/
-
-# ViaCEP API Configuration
-VIACEP_BASE_URL=https://viacep.com.br/ws
-RATE_LIMIT_PER_SECOND=5
-
-# Web Scraping Configuration
-SCRAPING_BASE_URL=https://codigo-postal.org/pt-br/brasil/sp/sao-paulo/
-SCRAPING_DELAY=2
-
-# Processing Configuration
-MAX_CEPS=10000
-REQUEST_TIMEOUT=30
-RETRY_ATTEMPTS=3
-LOG_LEVEL=INFO
-
-# File Paths
-CEPS_CSV_PATH=data/ceps_collected.csv
-ERRORS_CSV_PATH=data/viacep_errors.csv
-```
+Copy env.local.template as listed below and edit as desired
 
 ### Environment File Precedence
 
 The system loads environment files in the following order (later files override earlier ones):
+
 1. `.env` - Default values
 2. `.env.local` - Local overrides
 3. `.env.{ENV}` - Environment-specific overrides (e.g., `.env.staging`)
@@ -209,7 +169,7 @@ docker-compose exec app python src/main.py --max-ceps 100 --export-format json
          ▼
 ┌─────────────────┐
 │  ViaCEP Client  │  Queries ViaCEP API for each CEP
-│  (Processors)    │  Handles retries and errors
+│  (Processors)   │  Handles retries and errors
 └────────┬────────┘
          │
          ▼
@@ -220,20 +180,22 @@ docker-compose exec app python src/main.py --max-ceps 100 --export-format json
          │
          ▼
 ┌─────────────────┐
-│  Exporters     │  Exports to JSON/XML
-│  (Exporters)   │
+│  Exporters      │  Exports to JSON/XML
+│  (Exporters)    │
 └─────────────────┘
 ```
 
 ### Component Details
 
 #### 1. Collectors (`src/collectors/`)
+
 - **WebScraper**: Navigates codigo-postal.org to collect CEPs
   - Supports sequential and parallel scraping
   - Respects delays between requests
   - Saves results to CSV
 
 #### 2. Processors (`src/processors/`)
+
 - **CSVHandler**: Reads and validates CEP CSV files
   - Validates CEP format (8 digits)
   - Uses Pandas for efficient processing
@@ -243,12 +205,14 @@ docker-compose exec app python src/main.py --max-ceps 100 --export-format json
   - Records errors to CSV
 
 #### 3. Queue (`src/queue/`)
+
 - **QueueManager**: Manages RabbitMQ queue
   - Publishes CEPs to queue
   - Consumes with rate limiting
   - Handles connection errors
 
 #### 4. Storage (`src/storage/`)
+
 - **DatabaseManager**: PostgreSQL operations
   - Connection pooling
   - Session management
@@ -258,6 +222,7 @@ docker-compose exec app python src/main.py --max-ceps 100 --export-format json
   - Indexes for performance
 
 #### 5. Exporters (`src/exporters/`)
+
 - **JSONExporter**: Exports to JSON format
   - Pretty printing option
   - Metadata support
@@ -266,6 +231,7 @@ docker-compose exec app python src/main.py --max-ceps 100 --export-format json
   - Pretty printing option
 
 #### 6. Utils (`src/utils/`)
+
 - **ConfigHelper**: Environment configuration
   - Multi-environment support
   - .env file loading
@@ -275,16 +241,19 @@ docker-compose exec app python src/main.py --max-ceps 100 --export-format json
 ### Data Flow
 
 1. **Collection Phase**
+
    - WebScraper navigates neighborhoods
    - Extracts CEPs from pages
    - Saves to CSV file
 
 2. **Queue Phase**
+
    - CSVHandler reads and validates CEPs
    - QueueManager publishes to RabbitMQ
    - Rate limiting configured
 
 3. **Processing Phase**
+
    - QueueManager consumes from queue
    - ViaCEPClient queries API for each CEP
    - DatabaseManager stores results
@@ -383,33 +352,14 @@ docker-compose exec app python src/main.py --max-ceps 10 --process-limit 10
 
 ### Example 4: Export Only (No Processing)
 
-If you just want to export existing data:
+If you just want to export existing data from the database:
 
 ```bash
-# 1. Skip collection and processing
-# 2. Only export from database
-
-# First, ensure you have data in the database
-# Then use Python directly:
-
-docker-compose exec app python -c "
-from pathlib import Path
-from src.storage.database import DatabaseManager
-from src.exporters.json_exporter import JSONExporter
-from src.exporters.xml_exporter import XMLExporter
-
-db = DatabaseManager()
-db.connect()
-
-json_exp = JSONExporter(db)
-json_exp.export_to_file(Path('data/export.json'))
-
-xml_exp = XMLExporter(db)
-xml_exp.export_to_file(Path('data/export.xml'))
-
-db.disconnect()
-"
+# Simple one-liner
+docker-compose exec app python scripts/export_only.py
 ```
+
+This will export all CEPs from the database to both JSON and XML formats.
 
 ### Example 5: Custom Export Format
 
@@ -498,6 +448,7 @@ docker-compose exec app pytest --cov=src
 ### Code Quality
 
 The project follows Python best practices:
+
 - Type hints throughout
 - Comprehensive docstrings
 - Error handling
