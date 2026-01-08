@@ -208,4 +208,3 @@ def get_config(env: Optional[str] = None, force_reload: bool = False) -> ConfigH
         _config_env = env or os.getenv('ENV', 'local').lower()
     
     return _config
-

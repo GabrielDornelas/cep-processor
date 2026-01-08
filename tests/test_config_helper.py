@@ -77,7 +77,14 @@ class TestConfigHelper:
 
     def test_get_rabbitmq_url_from_components(self):
         """Test constructing RabbitMQ URL from components"""
+        # Clear existing RabbitMQ-related env vars first
+        env_vars_to_clear = ['RABBITMQ_URL', 'RABBITMQ_HOST', 'RABBITMQ_PORT', 
+                            'RABBITMQ_USER', 'RABBITMQ_PASSWORD']
+        for var in env_vars_to_clear:
+            os.environ.pop(var, None)
+        
         with patch.dict(os.environ, {
+            'SKIP_ENV_LOAD': 'true',
             'RABBITMQ_HOST': 'test_host',
             'RABBITMQ_PORT': '5673',
             'RABBITMQ_USER': 'test_user',
@@ -152,6 +159,31 @@ class TestConfigHelper:
         """Test getting environment name"""
         config = ConfigHelper(env='staging')
         assert config.get_environment() == 'staging'
+
+    @patch('src.utils.config_helper.load_dotenv')
+    @patch('src.utils.config_helper.Path.exists')
+    def test_load_env_files_precedence(self, mock_exists, mock_load_dotenv):
+        """Test that .env files are loaded in correct precedence order"""
+        # All files exist
+        mock_exists.return_value = True
+        
+        # Create config with staging environment
+        config = ConfigHelper(env='staging')
+        
+        # Verify load_dotenv was called 3 times
+        assert mock_load_dotenv.call_count == 3
+        
+        # Get the project root from the config
+        project_root = config.project_root
+        
+        # Verify order: .env, .env.local, .env.staging
+        calls = mock_load_dotenv.call_args_list
+        assert str(calls[0][0][0]) == str(project_root / '.env')
+        assert calls[0][1]['override'] is True
+        assert str(calls[1][0][0]) == str(project_root / '.env.local')
+        assert calls[1][1]['override'] is True
+        assert str(calls[2][0][0]) == str(project_root / '.env.staging')
+        assert calls[2][1]['override'] is True
 
 
 class TestGetConfig:
