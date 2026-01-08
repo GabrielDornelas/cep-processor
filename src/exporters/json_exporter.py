@@ -66,7 +66,8 @@ class JSONExporter:
             # Convert to dictionaries
             ceps_data = [cep.to_dict() for cep in ceps]
 
-            # Prepare export data
+            # Prepare export data (default: just the list)
+            export_data = ceps_data
             if include_metadata:
                 export_data = {
                     'metadata': {
@@ -77,18 +78,13 @@ class JSONExporter:
                     },
                     'ceps': ceps_data
                 }
-            else:
-                export_data = ceps_data
 
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Write JSON file
             with open(output_path, 'w', encoding='utf-8') as f:
-                if pretty:
-                    json.dump(export_data, f, indent=2, ensure_ascii=False)
-                else:
-                    json.dump(export_data, f, ensure_ascii=False)
+                json.dump(export_data, f, indent=2 if pretty else None, ensure_ascii=False)
 
             self.logger.info(f"Successfully exported {len(ceps_data)} CEPs to {output_path}")
             return True
@@ -126,7 +122,8 @@ class JSONExporter:
             # Convert to dictionaries
             ceps_data = [cep.to_dict() for cep in ceps]
 
-            # Prepare export data
+            # Prepare export data (default: just the list)
+            export_data = ceps_data
             if include_metadata:
                 export_data = {
                     'metadata': {
@@ -135,18 +132,13 @@ class JSONExporter:
                     },
                     'ceps': ceps_data
                 }
-            else:
-                export_data = ceps_data
 
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Write JSON file
             with open(output_path, 'w', encoding='utf-8') as f:
-                if pretty:
-                    json.dump(export_data, f, indent=2, ensure_ascii=False)
-                else:
-                    json.dump(export_data, f, ensure_ascii=False)
+                json.dump(export_data, f, indent=2 if pretty else None, ensure_ascii=False)
 
             self.logger.info(f"Successfully exported {len(ceps_data)} CEPs to {output_path}")
             return True
@@ -179,7 +171,8 @@ class JSONExporter:
             # Convert to dictionaries
             ceps_data = [cep.to_dict() for cep in ceps]
 
-            # Prepare export data
+            # Prepare export data (default: just the list)
+            export_data = ceps_data
             if include_metadata:
                 export_data = {
                     'metadata': {
@@ -188,14 +181,9 @@ class JSONExporter:
                     },
                     'ceps': ceps_data
                 }
-            else:
-                export_data = ceps_data
 
             # Convert to JSON string
-            if pretty:
-                return json.dumps(export_data, indent=2, ensure_ascii=False)
-            else:
-                return json.dumps(export_data, ensure_ascii=False)
+            return json.dumps(export_data, indent=2 if pretty else None, ensure_ascii=False)
 
         except Exception as e:
             self.logger.error(f"Error exporting to JSON string: {e}")

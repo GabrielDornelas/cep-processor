@@ -6,13 +6,13 @@ import json
 import time
 import threading
 from typing import Optional, Callable, Dict, Any
-from queue import Queue
+import queue as stdlib_queue
 
 import pika
 from pika.exceptions import AMQPConnectionError, AMQPChannelError
 
+import os
 from src.utils.logger import setup_logger
-from src.utils.config_helper import get_config
 
 
 class QueueManager:
@@ -32,15 +32,27 @@ class QueueManager:
         Initialize the queue manager.
 
         Args:
-            rabbitmq_url: RabbitMQ connection URL (optional, will use ConfigHelper if not provided)
+            rabbitmq_url: RabbitMQ connection URL (optional, will use environment variables if not provided)
             queue_name: Name of the queue for CEP processing
-            rate_limit_per_second: Maximum requests per second (optional, will use ConfigHelper if not provided)
+            rate_limit_per_second: Maximum requests per second (optional, will use environment variables if not provided)
             prefetch_count: Number of unacknowledged messages per consumer
         """
-        config = get_config()
-        self.rabbitmq_url = rabbitmq_url or config.get_rabbitmq_url()
+        if rabbitmq_url:
+            self.rabbitmq_url = rabbitmq_url
+        else:
+            # Try RABBITMQ_URL first, then construct from components
+            rabbitmq_url = os.getenv('RABBITMQ_URL')
+            if rabbitmq_url:
+                self.rabbitmq_url = rabbitmq_url
+            else:
+                host = os.getenv('RABBITMQ_HOST', 'localhost')
+                port = os.getenv('RABBITMQ_PORT', '5672')
+                user = os.getenv('RABBITMQ_USER', 'guest')
+                password = os.getenv('RABBITMQ_PASSWORD', 'guest')
+                self.rabbitmq_url = f"amqp://{user}:{password}@{host}:{port}/"
+        
         self.queue_name = queue_name
-        self.rate_limit_per_second = rate_limit_per_second or config.get_rate_limit_per_second()
+        self.rate_limit_per_second = rate_limit_per_second or float(os.getenv('RATE_LIMIT_PER_SECOND', '5.0'))
         self.prefetch_count = prefetch_count
         self.logger = setup_logger(name="queue_manager")
         

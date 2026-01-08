@@ -8,9 +8,9 @@ from typing import Optional, Dict, Any
 
 import requests
 
+import os
 from src.utils.logger import setup_logger
 from src.utils.error_handler import ErrorHandler
-from src.utils.config_helper import get_config
 
 
 class ViaCEPClient:
@@ -31,17 +31,16 @@ class ViaCEPClient:
         Initialize the ViaCEP client.
 
         Args:
-            base_url: Base URL for ViaCEP API (optional, will use ConfigHelper if not provided)
-            timeout: Request timeout in seconds (optional, will use ConfigHelper if not provided)
-            retry_attempts: Number of retry attempts for failed requests (optional, will use ConfigHelper if not provided)
+            base_url: Base URL for ViaCEP API (optional, will use environment variables if not provided)
+            timeout: Request timeout in seconds (optional, will use environment variables if not provided)
+            retry_attempts: Number of retry attempts for failed requests (optional, will use environment variables if not provided)
             retry_delay: Delay between retries in seconds
-            errors_csv_path: Path to CSV file for storing errors. If None, will use ConfigHelper.
+            errors_csv_path: Path to CSV file for storing errors. If None, will use environment variables.
                             Default: data/viacep_errors.csv
         """
-        config = get_config()
-        self.base_url = (base_url or config.get_viacep_base_url()).rstrip('/')
-        self.timeout = timeout or config.get_request_timeout()
-        self.retry_attempts = retry_attempts or config.get_retry_attempts()
+        self.base_url = (base_url or os.getenv('VIACEP_BASE_URL', 'https://viacep.com.br/ws')).rstrip('/')
+        self.timeout = timeout or int(os.getenv('REQUEST_TIMEOUT', '30'))
+        self.retry_attempts = retry_attempts or int(os.getenv('RETRY_ATTEMPTS', '3'))
         self.retry_delay = retry_delay
         self.logger = setup_logger(name="viacep_client")
         self.session = requests.Session()
@@ -52,7 +51,12 @@ class ViaCEPClient:
         
         # Initialize error handler
         if errors_csv_path is None:
-            errors_csv_path = config.get_errors_csv_path()
+            errors_csv_path_str = os.getenv('ERRORS_CSV_PATH', 'data/viacep_errors.csv')
+            errors_csv_path = Path(errors_csv_path_str)
+            if not errors_csv_path.is_absolute():
+                # Make relative to project root
+                project_root = Path(__file__).parent.parent.parent
+                errors_csv_path = project_root / errors_csv_path_str
         self.error_handler = ErrorHandler(errors_csv_path=errors_csv_path)
 
     def query_cep(self, cep: str) -> Optional[Dict[str, Any]]:

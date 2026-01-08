@@ -227,8 +227,8 @@ class XMLExporter:
             # Parse and pretty print
             dom = minidom.parseString(xml_string)
             return dom.toprettyxml(indent="  ", encoding=None)
-        else:
-            return xml_string
+        
+        return xml_string
 
     def _get_current_timestamp(self) -> str:
         """Get current timestamp in ISO format."""

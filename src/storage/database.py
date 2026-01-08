@@ -2,6 +2,7 @@
 Database connection and operations manager
 """
 
+import os
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -12,7 +13,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from src.storage.models import Base, CEP
 from src.utils.logger import setup_logger
-from src.utils.config_helper import get_config
 
 
 class DatabaseManager:
@@ -26,11 +26,23 @@ class DatabaseManager:
         Initialize database manager.
 
         Args:
-            database_url: PostgreSQL connection URL (optional, will use ConfigHelper if not provided)
+            database_url: PostgreSQL connection URL (optional, will use environment variables if not provided)
                 Format: postgresql://user:password@host:port/database
         """
-        config = get_config()
-        self.database_url = database_url or config.get_database_url()
+        if database_url:
+            self.database_url = database_url
+        else:
+            # Try DATABASE_URL first, then construct from components
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                self.database_url = database_url
+            else:
+                host = os.getenv('POSTGRES_HOST', 'localhost')
+                port = os.getenv('POSTGRES_PORT', '5432')
+                user = os.getenv('POSTGRES_USER', 'cep_user')
+                password = os.getenv('POSTGRES_PASSWORD', 'cep_password')
+                database = os.getenv('POSTGRES_DB', 'cep_processor')
+                self.database_url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
         self.logger = setup_logger(name="database_manager")
         self.engine: Optional[Engine] = None
         self.SessionLocal: Optional[sessionmaker] = None

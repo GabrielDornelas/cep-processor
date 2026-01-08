@@ -2,6 +2,7 @@
 Unit tests for ViaCEP client module
 """
 
+import os
 import pytest
 from unittest.mock import Mock, patch
 from pathlib import Path
@@ -11,27 +12,21 @@ from src.processors.viacep_client import ViaCEPClient
 
 
 @pytest.fixture
-def mock_config():
-    """Fixture to provide a mock config for all tests"""
-    mock = Mock()
-    mock.get_viacep_base_url.return_value = "https://viacep.com.br/ws"
-    mock.get_request_timeout.return_value = 30
-    mock.get_retry_attempts.return_value = 3
-    mock.get_errors_csv_path.return_value = Path("data/viacep_errors.csv")
-    return mock
-
-
-@pytest.fixture
-def mock_get_config(mock_config):
-    """Fixture to patch get_config and return mock_config"""
-    with patch('src.processors.viacep_client.get_config', return_value=mock_config) as mock:
-        yield mock
+def mock_env_vars():
+    """Fixture to mock environment variables for ViaCEP tests"""
+    with patch.dict('os.environ', {
+        'VIACEP_BASE_URL': 'https://viacep.com.br/ws',
+        'REQUEST_TIMEOUT': '30',
+        'RETRY_ATTEMPTS': '3',
+        'ERRORS_CSV_PATH': 'data/viacep_errors.csv'
+    }):
+        yield
 
 
 class TestViaCEPClient:
     """Test cases for ViaCEPClient class"""
 
-    def test_init(self, mock_get_config):
+    def test_init(self, mock_env_vars):
         """Test ViaCEPClient initialization"""
         client = ViaCEPClient(
             base_url="https://viacep.com.br/ws",
@@ -44,7 +39,7 @@ class TestViaCEPClient:
         assert client.retry_attempts == 3
 
     @patch('src.processors.viacep_client.requests.Session')
-    def test_query_cep_success(self, mock_session_class, mock_get_config):
+    def test_query_cep_success(self, mock_session_class, mock_env_vars):
         """Test successful CEP query"""
         mock_session = Mock()
         mock_response = Mock()
@@ -74,7 +69,7 @@ class TestViaCEPClient:
         assert result['uf'] == 'SP'
 
     @patch('src.processors.viacep_client.requests.Session')
-    def test_query_cep_not_found(self, mock_session_class, mock_get_config):
+    def test_query_cep_not_found(self, mock_session_class, mock_env_vars):
         """Test CEP not found (erro: true)"""
         mock_session = Mock()
         mock_response = Mock()
@@ -90,7 +85,7 @@ class TestViaCEPClient:
         assert result is None
 
     @patch('src.processors.viacep_client.requests.Session')
-    def test_query_cep_timeout_retry(self, mock_session_class, mock_get_config):
+    def test_query_cep_timeout_retry(self, mock_session_class, mock_env_vars):
         """Test timeout with retry"""
         mock_session = Mock()
         mock_session.headers = {}
@@ -117,7 +112,7 @@ class TestViaCEPClient:
         assert mock_session.get.call_count == 2
 
     @patch('src.processors.viacep_client.requests.Session')
-    def test_query_cep_max_retries(self, mock_session_class, mock_get_config):
+    def test_query_cep_max_retries(self, mock_session_class, mock_env_vars):
         """Test max retries reached"""
         mock_session = Mock()
         mock_session.headers = {}
@@ -130,7 +125,7 @@ class TestViaCEPClient:
         assert result is None
         assert mock_session.get.call_count == 2
 
-    def test_is_valid_response(self, mock_get_config):
+    def test_is_valid_response(self, mock_env_vars):
         """Test response validation"""
         client = ViaCEPClient()
         
