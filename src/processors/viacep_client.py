@@ -125,7 +125,10 @@ class ViaCEPClient:
                 error_msg = f"Timeout querying CEP {cep} (attempt {attempt}/{self.retry_attempts})"
                 self.logger.warning(error_msg)
                 if attempt < self.retry_attempts:
-                    time.sleep(self.retry_delay * attempt)  # Exponential backoff
+                    # Exponential backoff: 2^attempt * retry_delay (min 1s, max 30s)
+                    backoff_time = min(max(self.retry_delay * (2 ** attempt), 1.0), 30.0)
+                    self.logger.debug(f"Waiting {backoff_time:.2f}s before retry...")
+                    time.sleep(backoff_time)
                 else:
                     self.logger.error(f"Max retries reached for CEP {cep}")
                     # Record error to CSV on final failure
@@ -139,8 +142,27 @@ class ViaCEPClient:
             except requests.RequestException as e:
                 error_msg = f"Error querying CEP {cep}: {e} (attempt {attempt}/{self.retry_attempts})"
                 self.logger.error(error_msg)
+                
+                # Check if it's a connection error (likely rate limiting/blocking)
+                is_connection_error = any(keyword in str(e).lower() for keyword in [
+                    'connection refused', 'connection aborted', 'connection reset',
+                    'remote end closed', 'failed to establish'
+                ])
+                
                 if attempt < self.retry_attempts:
-                    time.sleep(self.retry_delay * attempt)  # Exponential backoff
+                    # Exponential backoff with longer delays for connection errors
+                    if is_connection_error:
+                        # Longer backoff for connection errors (likely blocking)
+                        backoff_time = min(max(self.retry_delay * (2 ** attempt) * 2, 2.0), 60.0)
+                        self.logger.warning(
+                            f"Connection error detected (possible rate limiting). "
+                            f"Waiting {backoff_time:.2f}s before retry..."
+                        )
+                    else:
+                        # Standard exponential backoff for other errors
+                        backoff_time = min(max(self.retry_delay * (2 ** attempt), 1.0), 30.0)
+                        self.logger.debug(f"Waiting {backoff_time:.2f}s before retry...")
+                    time.sleep(backoff_time)
                 else:
                     self.logger.error(f"Max retries reached for CEP {cep}")
                     # Record error to CSV on final failure

@@ -51,12 +51,17 @@ class QueueManager:
                 self.rabbitmq_url = f"amqp://{user}:{password}@{host}:{port}/"
         
         self.queue_name = queue_name
-        self.rate_limit_per_second = rate_limit_per_second or float(os.getenv('RATE_LIMIT_PER_SECOND', '5.0'))
+        self.rate_limit_per_second = rate_limit_per_second or float(os.getenv('RATE_LIMIT_PER_SECOND', '2.0'))
         self.prefetch_count = prefetch_count
         self.logger = setup_logger(name="queue_manager")
         
         # Calculate delay between requests
         self.delay_between_requests = 1.0 / self.rate_limit_per_second if self.rate_limit_per_second > 0 else 0
+        
+        # Block detection and backoff
+        self._consecutive_errors = 0
+        self._max_consecutive_errors = 3
+        self._backoff_multiplier = 1.0
         
         # Connection and channel
         self.connection: Optional[pika.BlockingConnection] = None
@@ -109,13 +114,17 @@ class QueueManager:
         """
         Enforce rate limiting by adding delay if necessary.
         Thread-safe method.
+        Applies backoff multiplier if there were recent errors.
         """
         with self._rate_limit_lock:
             current_time = time.time()
             time_since_last_request = current_time - self._last_request_time
             
-            if time_since_last_request < self.delay_between_requests:
-                sleep_time = self.delay_between_requests - time_since_last_request
+            # Apply backoff multiplier to delay if there were errors
+            effective_delay = self.delay_between_requests * self._backoff_multiplier
+            
+            if time_since_last_request < effective_delay:
+                sleep_time = effective_delay - time_since_last_request
                 time.sleep(sleep_time)
             
             self._last_request_time = time.time()
@@ -211,7 +220,7 @@ class QueueManager:
                     ch.basic_ack(delivery_tag=method.delivery_tag)
                     return
 
-                # Enforce rate limiting
+                # Enforce rate limiting (with backoff if errors detected)
                 self._enforce_rate_limit()
 
                 # Process CEP
@@ -220,8 +229,24 @@ class QueueManager:
 
                 if result:
                     self.logger.debug(f"Successfully processed CEP {cep}")
+                    # Reset error counter on success
+                    self._consecutive_errors = 0
+                    self._backoff_multiplier = 1.0
                 else:
                     self.logger.warning(f"Failed to process CEP {cep}")
+                    # Track consecutive errors
+                    self._consecutive_errors += 1
+                    
+                    # If too many consecutive errors, increase backoff
+                    if self._consecutive_errors >= self._max_consecutive_errors:
+                        self._backoff_multiplier = min(self._backoff_multiplier * 2.0, 10.0)  # Max 10x
+                        pause_time = self.delay_between_requests * self._backoff_multiplier
+                        self.logger.warning(
+                            f"Detected {self._consecutive_errors} consecutive errors. "
+                            f"Pausing for {pause_time:.2f}s before next request..."
+                        )
+                        time.sleep(pause_time)
+                        self._consecutive_errors = 0  # Reset after pause
 
                 # Acknowledge message
                 ch.basic_ack(delivery_tag=method.delivery_tag)
