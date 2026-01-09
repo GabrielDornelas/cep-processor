@@ -35,7 +35,8 @@ class TestQueueManager:
         assert manager.rabbitmq_url == "amqp://guest:guest@localhost:5672/"
         assert manager.queue_name == "test_queue"
         assert manager.rate_limit_per_second == 5.0
-        assert manager.delay_between_requests == 0.2  # 1.0 / 5.0
+        # Delay is minimum 1.0 second to avoid API blocking (even if rate limit would allow faster)
+        assert manager.delay_between_requests == 1.0
 
     @patch('src.queue.queue_manager.pika.BlockingConnection')
     def test_connect_success(self, mock_connection_class, mock_env_vars):

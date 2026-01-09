@@ -51,12 +51,18 @@ class QueueManager:
                 self.rabbitmq_url = f"amqp://{user}:{password}@{host}:{port}/"
         
         self.queue_name = queue_name
-        self.rate_limit_per_second = rate_limit_per_second or float(os.getenv('RATE_LIMIT_PER_SECOND', '2.0'))
+        # Reduced default rate limit to 1.0 req/s (more conservative to avoid blocking)
+        self.rate_limit_per_second = rate_limit_per_second or float(os.getenv('RATE_LIMIT_PER_SECOND', '1.0'))
         self.prefetch_count = prefetch_count
         self.logger = setup_logger(name="queue_manager")
         
         # Calculate delay between requests
-        self.delay_between_requests = 1.0 / self.rate_limit_per_second if self.rate_limit_per_second > 0 else 0
+        # Always enforce minimum 1 second delay to avoid API blocking
+        if self.rate_limit_per_second > 0:
+            calculated_delay = 1.0 / self.rate_limit_per_second
+            self.delay_between_requests = max(calculated_delay, 1.0)  # Minimum 1 second
+        else:
+            self.delay_between_requests = 1.0
         
         # Block detection and backoff
         self._consecutive_errors = 0
@@ -232,6 +238,9 @@ class QueueManager:
                     # Reset error counter on success
                     self._consecutive_errors = 0
                     self._backoff_multiplier = 1.0
+                    # Always wait after successful request to respect rate limit
+                    # This ensures we don't make requests too quickly even if queue is fast
+                    time.sleep(self.delay_between_requests)
                 else:
                     self.logger.warning(f"Failed to process CEP {cep}")
                     # Track consecutive errors
@@ -247,6 +256,9 @@ class QueueManager:
                         )
                         time.sleep(pause_time)
                         self._consecutive_errors = 0  # Reset after pause
+                    else:
+                        # Even on error, wait to avoid hammering the API
+                        time.sleep(self.delay_between_requests * 1.5)
 
                 # Acknowledge message
                 ch.basic_ack(delivery_tag=method.delivery_tag)
