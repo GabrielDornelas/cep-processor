@@ -450,6 +450,10 @@ The project follows Python best practices:
 - Structured logging
 - Unit tests for all modules
 
+### Future Improvements
+
+For a list of potential improvements and enhancements, see [IMPROVEMENTS.md](IMPROVEMENTS.md).
+
 ### Adding New Features
 
 1. Create feature branch
