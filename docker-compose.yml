@@ -45,6 +45,7 @@ services:
     environment:
       ENV: ${ENV:-local}
       DOCKER_CONTAINER: "true"
+      TZ: ${TZ:-America/Sao_Paulo}
       # Database
       DATABASE_URL: postgresql://${POSTGRES_USER:-cep_user}:${POSTGRES_PASSWORD:-cep_password}@postgres:5432/${POSTGRES_DB:-cep_processor}
       POSTGRES_HOST: postgres

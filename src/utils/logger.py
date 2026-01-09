@@ -6,6 +6,25 @@ import logging
 import sys
 from pathlib import Path
 from typing import Optional
+from datetime import datetime
+import time
+
+
+class LocalTimeFormatter(logging.Formatter):
+    """Custom formatter that uses local timezone."""
+    
+    def formatTime(self, record, datefmt=None):
+        """Format time using local timezone."""
+        # Convert timestamp to local timezone
+        # datetime.fromtimestamp() uses system's local timezone
+        ct = datetime.fromtimestamp(record.created)
+        # If system timezone is not set, try to use TZ environment variable
+        # or default to local time
+        if datefmt:
+            s = ct.strftime(datefmt)
+        else:
+            s = ct.strftime(self.default_time_format)
+        return s
 
 
 def setup_logger(
@@ -34,8 +53,8 @@ def setup_logger(
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
-    # Formatter
-    formatter = logging.Formatter(
+    # Formatter with local timezone
+    formatter = LocalTimeFormatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
